@@ -3,7 +3,7 @@ Content-Type: application/json
 
 {
     "valor": 2500,
-    "tipo": "d",
+    "tipo": "c",
     "descricao": "teste"
 }
 

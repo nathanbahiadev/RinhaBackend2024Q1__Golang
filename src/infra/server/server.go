@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Server struct {
@@ -20,6 +21,9 @@ func New(port string, repository domain.RepositoryInterface) Server {
 		Repository: repository,
 		Router:     chi.NewRouter(),
 	}
+
+	server.Router.Use(middleware.Logger)
+
 	server.Router.Post(
 		"/clientes/{id}/transacoes",
 		handlers.NewCreateTransactionHandler(
