@@ -1,0 +1,13 @@
+version: "2"
+cloud:
+  project: '01HR0TKXHEZ5XMS6N3Y6A1494G'
+sql:
+  - engine: "postgresql"
+    queries: "src/infra/database/sqlc/queries.sql"
+    schema: "init.sql"
+    database:
+      managed: true
+    gen:
+      go:
+        package: "sqlc"
+        out: "src/infra/database/sqlc"
