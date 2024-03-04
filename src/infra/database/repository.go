@@ -7,14 +7,16 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type SqlRepository struct{}
+type SqlRepository struct {
+	Context context.Context
+}
 
-func NewSqlRepositories() *SqlRepository {
-	return &SqlRepository{}
+func NewSqlRepositories(ctx context.Context) *SqlRepository {
+	return &SqlRepository{Context: ctx}
 }
 
 func (r *SqlRepository) GetClient(clientID int32) (*domain.Client, error) {
-	conn := GetConn()
+	conn := GetConn(r.Context)
 	defer conn.Release()
 
 	if clientID < 0 || clientID > 5 {
@@ -22,7 +24,7 @@ func (r *SqlRepository) GetClient(clientID int32) (*domain.Client, error) {
 	}
 
 	result := conn.QueryRow(
-		context.Background(),
+		r.Context,
 		`SELECT ACCOUNT_LIMIT, BALANCE FROM CLIENTS WHERE ID = $1;`,
 		clientID,
 	)
@@ -43,11 +45,11 @@ func (r *SqlRepository) GetClient(clientID int32) (*domain.Client, error) {
 }
 
 func (r *SqlRepository) FindLastTransactionsByClient(clientID int32) ([]domain.Transaction, error) {
-	conn := GetConn()
+	conn := GetConn(r.Context)
 	defer conn.Release()
 
 	rows, err := conn.Query(
-		context.Background(),
+		r.Context,
 		`SELECT VALUE, TYPE, DESCRIPTION, CREATED_AT 
 		FROM TRANSACTIONS 
 		WHERE CLIENT_ID = $1 
@@ -78,10 +80,10 @@ func (r *SqlRepository) FindLastTransactionsByClient(clientID int32) ([]domain.T
 }
 
 func (r *SqlRepository) CreateTransactionAndUpdateBalance(client *domain.Client, t *domain.Transaction) error {
-	conn := GetConn()
+	conn := GetConn(r.Context)
 	defer conn.Release()
 
-	ctx := context.Background()
+	ctx := r.Context
 	tx, err := conn.Begin(ctx)
 
 	if err != nil {

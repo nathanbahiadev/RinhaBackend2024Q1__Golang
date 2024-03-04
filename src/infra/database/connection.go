@@ -12,18 +12,27 @@ var (
 	err error
 )
 
-func New(dsn string) (*pgxpool.Pool, error) {
-	db, err = pgxpool.New(context.Background(), dsn)
+func New(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
+	config, err := pgxpool.ParseConfig(dsn)
 
 	if err != nil {
-		log.Fatalf("erro ao criar conexão com o banco de dados", err.Error())
+		panic(err)
+	}
+
+	config.MinConns = 5
+	config.MaxConns = 25
+
+	db, err = pgxpool.NewWithConfig(ctx, config)
+
+	if err != nil {
+		panic(err)
 	}
 
 	return db, nil
 }
 
-func GetConn() *pgxpool.Conn {
-	conn, err := db.Acquire(context.Background())
+func GetConn(ctx context.Context) *pgxpool.Conn {
+	conn, err := db.Acquire(ctx)
 
 	if err != nil {
 		log.Fatalf("erro ao criar conexão com o banco de dados", err.Error())

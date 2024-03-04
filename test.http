@@ -2,9 +2,9 @@ POST http://localhost:9999/clientes/4/transacoes
 Content-Type: application/json
 
 {
-    "valor": 5000,
+    "valor": 1.2,
     "tipo": "c",
-    "descricao": "teste"
+    "descricao": "qqqqqqqqq"
 }
 
 

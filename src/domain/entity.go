@@ -30,7 +30,7 @@ func (t *Transaction) Validate() error {
 		return ErrInvalidTransactionValue
 	}
 
-	if len(t.Description) > 10 {
+	if t.Description == "" || len(t.Description) > 10 {
 		return ErrInvalidDescriptionLength
 	}
 

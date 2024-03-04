@@ -5,7 +5,7 @@ import "errors"
 var ErrClientNotFound = errors.New("client not found")
 var ErrInsufficientBalance = errors.New("insufficient balance")
 var ErrInvalidTransactionType = errors.New("invalid transaction type")
-var ErrInvalidDescriptionLength = errors.New("description's length must be lower or equal to 10")
+var ErrInvalidDescriptionLength = errors.New("description's length must be greater than 0 and lower or equal to 10")
 var ErrInvalidTransactionValue = errors.New("transaction's values must be greater than 0")
 
 type Exception struct {
