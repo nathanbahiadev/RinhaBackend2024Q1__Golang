@@ -17,6 +17,10 @@ func (r *SqlRepository) GetClient(clientID int32) (*domain.Client, error) {
 	conn := GetConn()
 	defer conn.Release()
 
+	if clientID < 0 || clientID > 5 {
+		return nil, domain.ErrClientNotFound
+	}
+
 	result := conn.QueryRow(
 		context.Background(),
 		`SELECT ACCOUNT_LIMIT, BALANCE FROM CLIENTS WHERE ID = $1;`,

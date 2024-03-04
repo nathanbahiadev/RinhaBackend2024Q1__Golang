@@ -8,7 +8,8 @@ import (
 )
 
 func main() {
-	err := database.New(os.Getenv("DATABASE_URL"))
+	db, err := database.New(os.Getenv("DATABASE_URL"))
+	defer db.Close()
 
 	if err != nil {
 		log.Fatalf("Falha ao iniciar banco de dados: %s", err)
@@ -16,7 +17,9 @@ func main() {
 
 	httpServer := server.New(os.Getenv("PORT"), database.NewSqlRepositories())
 
-	if err := httpServer.Start(); err != nil {
+	err = httpServer.Start()
+
+	if err != nil {
 		log.Fatalf("Falha ao iniciar servidor http: %s", err)
 	}
 }

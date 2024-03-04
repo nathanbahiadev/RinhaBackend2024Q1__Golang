@@ -2,36 +2,24 @@ package database
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var db *pgxpool.Pool
+var (
+	db  *pgxpool.Pool
+	err error
+)
 
-func New(dsn string) error {
-	config, err := pgxpool.ParseConfig(dsn)
-
-	if err != nil {
-		return fmt.Errorf("erro ao fazer o parse da configuração: %w", err)
-	}
-
-	config.MaxConns = 255
-	config.MinConns = 5
-	config.MaxConnLifetime = 10 * time.Minute
-	config.MaxConnIdleTime = 5 * time.Minute
-	config.HealthCheckPeriod = 30 * time.Second
-
-	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+func New(dsn string) (*pgxpool.Pool, error) {
+	db, err = pgxpool.New(context.Background(), dsn)
 
 	if err != nil {
-		return fmt.Errorf("erro ao criar o pool de conexões: %w", err)
+		log.Fatalf("erro ao criar conexão com o banco de dados", err.Error())
 	}
 
-	db = pool
-	return nil
+	return db, nil
 }
 
 func GetConn() *pgxpool.Conn {
