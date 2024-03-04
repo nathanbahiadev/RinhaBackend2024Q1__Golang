@@ -6,29 +6,33 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Server struct {
 	Port       string
 	Router     *chi.Mux
 	Repository domain.RepositoryInterface
+	// CacheRepository domain.CacheRepositoryInterface
 }
 
-func New(port string, repository domain.RepositoryInterface) Server {
+func New(
+	port string,
+	repository domain.RepositoryInterface,
+	// cacheRepository domain.CacheRepositoryInterface,
+) Server {
 	server := Server{
 		Port:       port,
 		Repository: repository,
-		Router:     chi.NewRouter(),
+		// CacheRepository: cacheRepository,
+		Router: chi.NewRouter(),
 	}
-
-	server.Router.Use(middleware.Logger)
 
 	server.Router.Post(
 		"/clientes/{id}/transacoes",
 		handlers.NewCreateTransactionHandler(
 			domain.NewCreateTransactionUseCase(
 				server.Repository,
+				// server.CacheRepository,
 			),
 		).Handle,
 	)
@@ -38,6 +42,7 @@ func New(port string, repository domain.RepositoryInterface) Server {
 		handlers.NewGetBalanceHandler(
 			domain.NewGetBalanceUseCase(
 				server.Repository,
+				// server.CacheRepository,
 			),
 		).Handle,
 	)

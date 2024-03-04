@@ -1,86 +1,64 @@
 version: '3'
 
-networks:
-  rinhanet:
-
 services:
   rinha_api1: &rinha_api1
     build: .
     container_name: rinha_api1
+    network_mode: host
     environment:
-      PORT: "3001"
-      POSTGRES_HOST: "rinha_postgres"
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: "mydatabase"
-      POSTGRES_USER: "myuser"
-      POSTGRES_PASSWORD: "mypassword"
-    ports:
-      - "3001"
+      PORT: ":3001"
+      DATABASE_URL: "postgres://myuser:mypassword@localhost:5432/mydatabase?sslmode=disable"
     entrypoint: ./server
-    networks:
-      - rinhanet
     depends_on:
-      rinha_postgres:
+      postgres:
         condition: service_healthy
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: "100MB"
+          cpus: "0.3"
+          memory: "50MB"
 
   rinha_api2:
     <<: *rinha_api1
     container_name: rinha_api2 
     environment:
-      PORT: "3002"
-      POSTGRES_HOST: "rinha_postgres"
-      POSTGRES_PORT: "5432"
-      POSTGRES_DB: "mydatabase"
-      POSTGRES_USER: "myuser"
-      POSTGRES_PASSWORD: "mypassword"
-    ports:
-      - "3002"
+      PORT: ":3002"
+      DATABASE_URL: "postgres://myuser:mypassword@localhost:5432/mydatabase?sslmode=disable"
 
-  rinha_postgres:
+  postgres:
     image: postgres:latest
     container_name: rinha_postgres
-    command: postgres -c 'max_connections=75' -c 'log_error_verbosity=terse'
+    command: postgres  -c 'work_mem=256MB' -c 'max_connections=255' -c 'log_error_verbosity=terse'
+    network_mode: host
     healthcheck:
       test: ["CMD-SHELL", "pg_isready"]
       interval: 5s
       timeout: 5s
       retries: 20
       start_period: 10s
-    networks:
-      - rinhanet
     environment:
       POSTGRES_DB: mydatabase
       POSTGRES_USER: myuser
       POSTGRES_PASSWORD: mypassword
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql      
-    ports:
-      - "5432"
     deploy:
       resources:
         limits:
-          cpus: '0.3'
-          memory: '300MB'
+          cpus: '0.6'
+          memory: '350MB'
 
   nginx:
     image: nginx:latest
     container_name: rinha_nginx
+    network_mode: host
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
     depends_on:
       - rinha_api1
       - rinha_api2
-    ports:
-      - "9999:9999" 
-    networks:
-      - rinhanet
     deploy:
       resources:
         limits:
-          cpus: "0.2"
+          cpus: "0.3"
           memory: "50MB" 

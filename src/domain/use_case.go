@@ -9,7 +9,9 @@ type CreateTransactionUseCase struct {
 }
 
 func NewCreateTransactionUseCase(repository RepositoryInterface) CreateTransactionUseCase {
-	return CreateTransactionUseCase{Repository: repository}
+	return CreateTransactionUseCase{
+		Repository: repository,
+	}
 }
 
 type InputCreateTransactionUseCase struct {
@@ -59,20 +61,23 @@ func (useCase CreateTransactionUseCase) Execute(input InputCreateTransactionUseC
 }
 
 type GetBalanceUseCase struct {
-	Repository RepositoryInterface
+	Repository      RepositoryInterface
+	CacheRepository CacheRepositoryInterface
 }
 
 func NewGetBalanceUseCase(repository RepositoryInterface) GetBalanceUseCase {
-	return GetBalanceUseCase{Repository: repository}
+	return GetBalanceUseCase{
+		Repository: repository,
+	}
 }
 
 type OutputGetBalanceUseCase struct {
-	Balance struct {
+	LastTransactions []Transaction `json:"ultimas_transacoes"`
+	Balance          struct {
 		Total int32     `json:"total"`
 		Date  time.Time `json:"data_extrato"`
 		Limit int32     `json:"limite"`
 	} `json:"saldo"`
-	LastTransactions []Transaction `json:"ultimas_transacoes"`
 }
 
 func (useCase GetBalanceUseCase) Execute(clientID int32) (OutputGetBalanceUseCase, *Exception) {

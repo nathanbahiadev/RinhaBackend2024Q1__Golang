@@ -3,36 +3,53 @@ package database
 import (
 	"context"
 	"crebito/src/domain"
-	"crebito/src/infra/database/sqlc"
-	"database/sql"
+
+	"github.com/jackc/pgx/v5"
 )
 
-type SqlRepository struct {
-	DB      *sql.DB
-	Queries *sqlc.Queries
-}
+type SqlRepository struct{}
 
-func NewSqlRepositories(db *sql.DB) SqlRepository {
-	return SqlRepository{DB: db, Queries: sqlc.New(db)}
+func NewSqlRepositories() *SqlRepository {
+	return &SqlRepository{}
 }
 
 func (r *SqlRepository) GetClient(clientID int32) (*domain.Client, error) {
-	if client, err := r.Queries.GetClient(context.Background(), clientID); err != nil {
-		if err == sql.ErrNoRows {
+	conn := GetConn()
+	defer conn.Release()
+
+	result := conn.QueryRow(
+		context.Background(),
+		`SELECT ACCOUNT_LIMIT, BALANCE FROM CLIENTS WHERE ID = $1;`,
+		clientID,
+	)
+
+	client := domain.Client{ID: clientID}
+
+	if err := result.Scan(
+		&client.AccountLimit,
+		&client.Balance,
+	); err != nil {
+		if err == pgx.ErrNoRows {
 			return nil, domain.ErrClientNotFound
 		}
 		return nil, err
-	} else {
-		return &domain.Client{
-			ID:           client.ID,
-			AccountLimit: client.AccountLimit,
-			Balance:      client.Balance,
-		}, nil
 	}
+
+	return &client, nil
 }
 
 func (r *SqlRepository) FindLastTransactionsByClient(clientID int32) ([]domain.Transaction, error) {
-	transactions, err := r.Queries.FindLastTransactionsByClient(context.Background(), clientID)
+	conn := GetConn()
+	defer conn.Release()
+
+	rows, err := conn.Query(
+		context.Background(),
+		`SELECT VALUE, TYPE, DESCRIPTION, CREATED_AT 
+		FROM TRANSACTIONS 
+		WHERE CLIENT_ID = $1 
+		ORDER BY ID DESC LIMIT 10;`,
+		clientID,
+	)
 
 	if err != nil {
 		return nil, err
@@ -40,43 +57,56 @@ func (r *SqlRepository) FindLastTransactionsByClient(clientID int32) ([]domain.T
 
 	var result []domain.Transaction
 
-	for _, t := range transactions {
-		result = append(result, domain.Transaction{
-			Value:       t.Value,
-			Type:        t.Type,
-			CreatedAt:   t.CreatedAt.Time,
-			Description: t.Description,
-		})
+	for rows.Next() {
+		var t domain.Transaction
+		if err := rows.Scan(
+			&t.Value,
+			&t.Type,
+			&t.Description,
+			&t.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, t)
 	}
 
 	return result, nil
 }
 
 func (r *SqlRepository) CreateTransactionAndUpdateBalance(client *domain.Client, t *domain.Transaction) error {
-	tx, err := r.DB.Begin()
+	conn := GetConn()
+	defer conn.Release()
+
+	ctx := context.Background()
+	tx, err := conn.Begin(ctx)
 
 	if err != nil {
 		return err
 	}
 
-	ctx := context.Background()
-	qtx := r.Queries.WithTx(tx)
+	_, err = tx.Exec(
+		ctx,
+		"INSERT INTO TRANSACTIONS (VALUE, TYPE, DESCRIPTION, CLIENT_ID) VALUES ($1, $2, $3, $4)",
+		t.Value,
+		t.Type,
+		t.Description,
+		t.ClientID,
+	)
 
-	if err := qtx.CreateTransaction(ctx, sqlc.CreateTransactionParams{
-		Value:       t.Value,
-		Type:        t.Type,
-		ClientID:    t.ClientID,
-		Description: t.Description,
-	}); err != nil {
-		return tx.Rollback()
+	if err != nil {
+		return tx.Rollback(ctx)
 	}
 
-	if err := qtx.UpdateBalance(ctx, sqlc.UpdateBalanceParams{
-		ID:      client.ID,
-		Balance: client.Balance,
-	}); err != nil {
-		return tx.Rollback()
+	_, err = tx.Exec(
+		ctx,
+		"UPDATE CLIENTS SET BALANCE = $1 WHERE ID = $2;",
+		client.Balance,
+		client.ID,
+	)
+
+	if err != nil {
+		return tx.Rollback(ctx)
 	}
 
-	return tx.Commit()
+	return tx.Commit(ctx)
 }
