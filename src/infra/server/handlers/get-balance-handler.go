@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"crebito/src/domain"
+	"crebito/src/domain/usecases"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,10 +10,10 @@ import (
 )
 
 type GetBalanceHandler struct {
-	UseCase domain.GetBalanceUseCase
+	UseCase usecases.GetBalanceUseCase
 }
 
-func NewGetBalanceHandler(useCase domain.GetBalanceUseCase) GetBalanceHandler {
+func NewGetBalanceHandler(useCase usecases.GetBalanceUseCase) GetBalanceHandler {
 	return GetBalanceHandler{UseCase: useCase}
 }
 
@@ -22,7 +22,6 @@ func (h GetBalanceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
 		return
 	}
 

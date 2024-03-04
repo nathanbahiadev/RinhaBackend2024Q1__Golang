@@ -38,9 +38,9 @@ func (t *Transaction) Validate() error {
 }
 
 type Client struct {
-	ID           int32 `json:"id"`
-	AccountLimit int32 `json:"account_limit"`
-	Balance      int32 `json:"balance"`
+	ID           int32 `json:"-"`
+	AccountLimit int32 `json:"limite"`
+	Balance      int32 `json:"saldo"`
 }
 
 func (c *Client) AddTransaction(t *Transaction) error {

@@ -19,10 +19,6 @@ func (r *SqlRepository) GetClient(clientID int32) (*domain.Client, error) {
 	conn := GetConn(r.Context)
 	defer conn.Release()
 
-	if clientID < 0 || clientID > 5 {
-		return nil, domain.ErrClientNotFound
-	}
-
 	result := conn.QueryRow(
 		r.Context,
 		`SELECT ACCOUNT_LIMIT, BALANCE FROM CLIENTS WHERE ID = $1;`,
@@ -79,19 +75,51 @@ func (r *SqlRepository) FindLastTransactionsByClient(clientID int32) ([]domain.T
 	return result, nil
 }
 
-func (r *SqlRepository) CreateTransactionAndUpdateBalance(client *domain.Client, t *domain.Transaction) error {
+func (r *SqlRepository) CreateTransactionAndUpdateBalance(clientID int32, t *domain.Transaction) (*domain.Client, error) {
 	conn := GetConn(r.Context)
 	defer conn.Release()
 
-	ctx := r.Context
-	tx, err := conn.Begin(ctx)
+	tx, err := conn.Begin(r.Context)
 
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	defer tx.Rollback(r.Context)
+
+	client := &domain.Client{}
+
+	if err := conn.QueryRow(
+		r.Context,
+		`SELECT ACCOUNT_LIMIT, BALANCE FROM CLIENTS WHERE ID = $1 FOR UPDATE;`,
+		clientID,
+	).Scan(
+		&client.AccountLimit,
+		&client.Balance,
+	); err != nil {
+		if err == pgx.ErrNoRows {
+			return client, domain.ErrClientNotFound
+		}
+		return client, err
+	}
+
+	if err := client.AddTransaction(t); err != nil {
+		return client, err
 	}
 
 	_, err = tx.Exec(
-		ctx,
+		r.Context,
+		"UPDATE CLIENTS SET BALANCE = $1 WHERE ID = $2;",
+		client.Balance,
+		clientID,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = tx.Exec(
+		r.Context,
 		"INSERT INTO TRANSACTIONS (VALUE, TYPE, DESCRIPTION, CLIENT_ID) VALUES ($1, $2, $3, $4)",
 		t.Value,
 		t.Type,
@@ -100,19 +128,8 @@ func (r *SqlRepository) CreateTransactionAndUpdateBalance(client *domain.Client,
 	)
 
 	if err != nil {
-		return tx.Rollback(ctx)
+		return nil, err
 	}
 
-	_, err = tx.Exec(
-		ctx,
-		"UPDATE CLIENTS SET BALANCE = $1 WHERE ID = $2;",
-		client.Balance,
-		client.ID,
-	)
-
-	if err != nil {
-		return tx.Rollback(ctx)
-	}
-
-	return tx.Commit(ctx)
+	return client, tx.Commit(r.Context)
 }
