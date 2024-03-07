@@ -4,9 +4,7 @@ import "errors"
 
 var ErrClientNotFound = errors.New("client not found")
 var ErrInsufficientBalance = errors.New("insufficient balance")
-var ErrInvalidTransactionType = errors.New("invalid transaction type")
-var ErrInvalidDescriptionLength = errors.New("description's length must be greater than 0 and lower or equal to 10")
-var ErrInvalidTransactionValue = errors.New("transaction's values must be greater than 0")
+var ErrInvalidTransaction = errors.New("invalid transaction")
 
 type Exception struct {
 	Status  int    `json:"status"`
@@ -21,11 +19,7 @@ func HandleError(err error) *Exception {
 		e.Status = 404
 	case errors.Is(err, ErrInsufficientBalance):
 		e.Status = 422
-	case errors.Is(err, ErrInvalidTransactionType):
-		e.Status = 422
-	case errors.Is(err, ErrInvalidDescriptionLength):
-		e.Status = 422
-	case errors.Is(err, ErrInvalidTransactionValue):
+	case errors.Is(err, ErrInvalidTransaction):
 		e.Status = 422
 	default:
 		e.Status = 500

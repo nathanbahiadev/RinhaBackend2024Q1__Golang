@@ -1,48 +1,20 @@
 package usecases
 
 import (
+	"context"
 	"crebito/src/domain"
-	"time"
 )
 
-type GetBalanceUseCase struct {
-	Repository domain.RepositoryInterface
-}
+type TGetBalanceRepoFunc func(ctx context.Context, clientID int32) (*domain.Balance, error)
+type TGetBalanceUseCaseFunc func(ctx context.Context, clientID int32, getBalanceFunc TGetBalanceRepoFunc) (*domain.Balance, *domain.Exception)
 
-func NewGetBalanceUseCase(repository domain.RepositoryInterface) GetBalanceUseCase {
-	return GetBalanceUseCase{
-		Repository: repository,
-	}
-}
+func GetBalanceUseCase(ctx context.Context, clientID int32, getBalanceFunc TGetBalanceRepoFunc) (*domain.Balance, *domain.Exception) {
 
-type OutputGetBalanceUseCase struct {
-	Balance struct {
-		Total int32     `json:"total"`
-		Date  time.Time `json:"data_extrato"`
-		Limit int32     `json:"limite"`
-	} `json:"saldo"`
-	LastTransactions []domain.Transaction `json:"ultimas_transacoes"`
-}
-
-func (useCase GetBalanceUseCase) Execute(clientID int32) (OutputGetBalanceUseCase, *domain.Exception) {
-	var output OutputGetBalanceUseCase
-
-	client, err := useCase.Repository.GetClient(clientID)
+	output, err := getBalanceFunc(ctx, clientID)
 
 	if err != nil {
 		return output, domain.HandleError(err)
 	}
-
-	transactions, err := useCase.Repository.FindLastTransactionsByClient(clientID)
-
-	if err != nil {
-		return output, domain.HandleError(err)
-	}
-
-	output.Balance.Date = time.Now()
-	output.Balance.Limit = client.AccountLimit
-	output.Balance.Total = client.Balance
-	output.LastTransactions = transactions
 
 	return output, nil
 }
