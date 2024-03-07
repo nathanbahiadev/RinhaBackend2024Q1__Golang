@@ -20,7 +20,6 @@ func New(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	}
 
 	config.MinConns = 5
-	config.MaxConns = 25
 
 	db, err = pgxpool.NewWithConfig(ctx, config)
 

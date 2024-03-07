@@ -3,133 +3,82 @@ package database
 import (
 	"context"
 	"crebito/src/domain"
-
-	"github.com/jackc/pgx/v5"
+	"database/sql"
+	"strings"
 )
 
-type SqlRepository struct {
-	Context context.Context
-}
-
-func NewSqlRepositories(ctx context.Context) *SqlRepository {
-	return &SqlRepository{Context: ctx}
-}
-
-func (r *SqlRepository) GetClient(clientID int32) (*domain.Client, error) {
-	conn := GetConn(r.Context)
+func GetBalanceSQLFunc(ctx context.Context, clientID int32) (*domain.Balance, error) {
+	conn := GetConn(ctx)
 	defer conn.Release()
 
-	result := conn.QueryRow(
-		r.Context,
-		`SELECT ACCOUNT_LIMIT, BALANCE FROM CLIENTS WHERE ID = $1;`,
-		clientID,
-	)
-
-	client := domain.Client{ID: clientID}
-
-	if err := result.Scan(
-		&client.AccountLimit,
-		&client.Balance,
-	); err != nil {
-		if err == pgx.ErrNoRows {
-			return nil, domain.ErrClientNotFound
-		}
-		return nil, err
+	balance := &domain.Balance{
+		ClientBalance:    &domain.ClientBalance{},
+		LastTransactions: []domain.Transaction{},
 	}
 
-	return &client, nil
-}
-
-func (r *SqlRepository) FindLastTransactionsByClient(clientID int32) ([]domain.Transaction, error) {
-	conn := GetConn(r.Context)
-	defer conn.Release()
-
-	rows, err := conn.Query(
-		r.Context,
-		`SELECT VALUE, TYPE, DESCRIPTION, CREATED_AT 
-		FROM TRANSACTIONS 
-		WHERE CLIENT_ID = $1 
-		ORDER BY ID DESC LIMIT 10;`,
-		clientID,
-	)
+	rows, err := conn.Query(ctx, `SELECT * FROM GET_BALANCE($1)`, clientID)
 
 	if err != nil {
-		return nil, err
+		return balance, err
 	}
 
-	var result []domain.Transaction
-
 	for rows.Next() {
-		var t domain.Transaction
+		var cBalance sql.NullInt32
+		var cLimit sql.NullInt32
+		var tValue sql.NullInt32
+		var tType sql.NullString
+		var tDescription sql.NullString
+		var tCreatedAt sql.NullString
+
 		if err := rows.Scan(
-			&t.Value,
-			&t.Type,
-			&t.Description,
-			&t.CreatedAt,
+			&cLimit,
+			&cBalance,
+			&tValue,
+			&tType,
+			&tDescription,
+			&tCreatedAt,
 		); err != nil {
 			return nil, err
 		}
-		result = append(result, t)
+
+		balance.ClientBalance.Limit = cLimit.Int32
+		balance.ClientBalance.Total = cBalance.Int32
+
+		if tValue.Int32 != 0 {
+			balance.LastTransactions = append(balance.LastTransactions, domain.Transaction{
+				Value:       tValue.Int32,
+				Type:        tType.String,
+				Description: tDescription.String,
+				CreatedAt:   tCreatedAt.String,
+			})
+		}
 	}
 
-	return result, nil
+	if balance.ClientBalance.Limit == 0 {
+		return balance, domain.ErrClientNotFound
+	}
+
+	return balance, nil
 }
 
-func (r *SqlRepository) CreateTransactionAndUpdateBalance(clientID int32, t *domain.Transaction) (*domain.Client, error) {
-	conn := GetConn(r.Context)
+func CreateTransactionSQLFunc(ctx context.Context, clientID int32, t *domain.Transaction) (*domain.Client, error) {
+	conn := GetConn(ctx)
 	defer conn.Release()
 
-	tx, err := conn.Begin(r.Context)
-
-	if err != nil {
-		return nil, err
-	}
-
-	defer tx.Rollback(r.Context)
-
+	row := conn.QueryRow(ctx, `SELECT * FROM CREATE_TRANSACTION($1, $2, $3, $4)`, clientID, t.Value, t.Type, t.Description)
 	client := &domain.Client{}
 
-	if err := conn.QueryRow(
-		r.Context,
-		`SELECT ACCOUNT_LIMIT, BALANCE FROM CLIENTS WHERE ID = $1 FOR UPDATE;`,
-		clientID,
-	).Scan(
-		&client.AccountLimit,
-		&client.Balance,
-	); err != nil {
-		if err == pgx.ErrNoRows {
+	if err := row.Scan(&client.Balance, &client.AccountLimit); err == nil {
+		return client, nil
+	} else {
+		if strings.Contains(err.Error(), "CLIENT_NOT_FOUND") {
 			return client, domain.ErrClientNotFound
 		}
+
+		if strings.Contains(err.Error(), "LOW_LIMIT") {
+			return client, domain.ErrInsufficientBalance
+		}
+
 		return client, err
 	}
-
-	if err := client.AddTransaction(t); err != nil {
-		return client, err
-	}
-
-	_, err = tx.Exec(
-		r.Context,
-		"UPDATE CLIENTS SET BALANCE = $1 WHERE ID = $2;",
-		client.Balance,
-		clientID,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = tx.Exec(
-		r.Context,
-		"INSERT INTO TRANSACTIONS (VALUE, TYPE, DESCRIPTION, CLIENT_ID) VALUES ($1, $2, $3, $4)",
-		t.Value,
-		t.Type,
-		t.Description,
-		t.ClientID,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return client, tx.Commit(r.Context)
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crebito/src/domain/usecases"
 	"encoding/json"
 	"net/http"
@@ -10,14 +11,13 @@ import (
 )
 
 type GetBalanceHandler struct {
-	UseCase usecases.GetBalanceUseCase
+	Context        context.Context
+	UseCase        usecases.TGetBalanceUseCaseFunc
+	GetBalanceFunc usecases.TGetBalanceRepoFunc
 }
 
-func NewGetBalanceHandler(useCase usecases.GetBalanceUseCase) GetBalanceHandler {
-	return GetBalanceHandler{UseCase: useCase}
-}
+func (handler GetBalanceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 
-func (h GetBalanceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	clientID, err := strconv.Atoi(chi.URLParam(r, "id"))
 
 	if err != nil {
@@ -25,7 +25,7 @@ func (h GetBalanceHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	output, exception := h.UseCase.Execute(int32(clientID))
+	output, exception := handler.UseCase(handler.Context, int32(clientID), handler.GetBalanceFunc)
 
 	if exception != nil {
 		w.WriteHeader(exception.Status)

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crebito/src/domain/usecases"
 	"encoding/json"
 	"net/http"
@@ -10,14 +11,12 @@ import (
 )
 
 type CreateTransactionHandler struct {
-	UseCase usecases.CreateTransactionUseCase
+	Context    context.Context
+	UseCase    usecases.TCreateTransactionUseCaseFunc
+	CreateFunc usecases.TCreateTransactionRepoFunc
 }
 
-func NewCreateTransactionHandler(useCase usecases.CreateTransactionUseCase) CreateTransactionHandler {
-	return CreateTransactionHandler{UseCase: useCase}
-}
-
-func (h CreateTransactionHandler) Handle(w http.ResponseWriter, r *http.Request) {
+func (handler CreateTransactionHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	clientID, err := strconv.Atoi(chi.URLParam(r, "id"))
@@ -35,7 +34,7 @@ func (h CreateTransactionHandler) Handle(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	output, exception := h.UseCase.Execute(input)
+	output, exception := handler.UseCase(handler.Context, input, handler.CreateFunc)
 
 	if exception != nil {
 		w.WriteHeader(exception.Status)

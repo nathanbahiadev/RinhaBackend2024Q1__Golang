@@ -10,3 +10,5 @@ API desenvolvida utlizando:
 Minhas redes sociais:
 - Github - https://github.com/nathanbahiadev
 - LinkedIn - https://linkedin.com/in/nathanbahia
+
+<img src="gatling.png" />

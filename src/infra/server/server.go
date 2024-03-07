@@ -1,7 +1,7 @@
 package server
 
 import (
-	"crebito/src/domain"
+	"context"
 	"crebito/src/domain/usecases"
 	"crebito/src/infra/server/handlers"
 	"net/http"
@@ -10,34 +10,35 @@ import (
 )
 
 type Server struct {
-	Port       string
-	Router     *chi.Mux
-	Repository domain.RepositoryInterface
+	Port                         string
+	Context                      context.Context
+	Router                       *chi.Mux
+	CreateTransactionRepoFunc    usecases.TCreateTransactionRepoFunc
+	CreateTransactionUseCaseFunc usecases.TCreateTransactionUseCaseFunc
+	GetBalanceRepoFunc           usecases.TGetBalanceRepoFunc
+	GetBalanceUseCaseFunc        usecases.TGetBalanceUseCaseFunc
 }
 
 func (server Server) Start() error {
-	return http.ListenAndServe(server.Port, server.Router)
-}
-
-func New(
-	port string,
-	repository domain.RepositoryInterface,
-) Server {
-	server := Server{
-		Port:       port,
-		Repository: repository,
-		Router:     chi.NewRouter(),
-	}
+	server.Router = chi.NewRouter()
 
 	server.Router.Post(
 		"/clientes/{id}/transacoes",
-		handlers.NewCreateTransactionHandler(usecases.NewCreateTransactionUseCase(server.Repository)).Handle,
+		handlers.CreateTransactionHandler{
+			Context:    server.Context,
+			UseCase:    server.CreateTransactionUseCaseFunc,
+			CreateFunc: server.CreateTransactionRepoFunc,
+		}.Handle,
 	)
 
 	server.Router.Get(
 		"/clientes/{id}/extrato",
-		handlers.NewGetBalanceHandler(usecases.NewGetBalanceUseCase(server.Repository)).Handle,
+		handlers.GetBalanceHandler{
+			Context:        server.Context,
+			UseCase:        server.GetBalanceUseCaseFunc,
+			GetBalanceFunc: server.GetBalanceRepoFunc,
+		}.Handle,
 	)
 
-	return server
+	return http.ListenAndServe(server.Port, server.Router)
 }

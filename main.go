@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"crebito/src/domain"
+	"crebito/src/domain/usecases"
 	"crebito/src/infra/database"
 	"crebito/src/infra/server"
 	"log"
@@ -19,19 +19,18 @@ func main() {
 		log.Fatalf("Falha ao iniciar banco de dados: %s", err)
 	}
 
-	repository := database.NewSqlRepositories(ctx)
-	httpServer := server.New(os.Getenv("PORT"), repository)
+	httpServer := server.Server{
+		Port:                         os.Getenv("PORT"),
+		Context:                      ctx,
+		CreateTransactionUseCaseFunc: usecases.CreateTransactionUseCase,
+		GetBalanceUseCaseFunc:        usecases.GetBalanceUseCase,
+		CreateTransactionRepoFunc:    database.CreateTransactionSQLFunc,
+		GetBalanceRepoFunc:           database.GetBalanceSQLFunc,
+	}
 
-	startEngines(repository)
 	err = httpServer.Start()
 
 	if err != nil {
 		log.Fatalf("Falha ao iniciar servidor http: %s", err)
-	}
-}
-
-func startEngines(repository domain.RepositoryInterface) {
-	for i := 0; i < 50; i++ {
-		repository.GetClient(int32(i))
 	}
 }

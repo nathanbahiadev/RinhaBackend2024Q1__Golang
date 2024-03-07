@@ -1,18 +1,9 @@
 package usecases
 
 import (
+	"context"
 	"crebito/src/domain"
 )
-
-type CreateTransactionUseCase struct {
-	Repository domain.RepositoryInterface
-}
-
-func NewCreateTransactionUseCase(repository domain.RepositoryInterface) CreateTransactionUseCase {
-	return CreateTransactionUseCase{
-		Repository: repository,
-	}
-}
 
 type InputCreateTransactionUseCase struct {
 	ClientID    int32
@@ -21,33 +12,30 @@ type InputCreateTransactionUseCase struct {
 	Description string `json:"descricao"`
 }
 
-type OutputCreateTransactionUseCase struct {
-	Limit   int32 `json:"limite"`
-	Balance int32 `json:"saldo"`
-}
+type TCreateTransactionRepoFunc func(ctx context.Context, clientID int32, t *domain.Transaction) (*domain.Client, error)
+type TCreateTransactionUseCaseFunc func(ctx context.Context, input InputCreateTransactionUseCase, createFunc TCreateTransactionRepoFunc) (*domain.Client, *domain.Exception)
 
-func (useCase CreateTransactionUseCase) Execute(input InputCreateTransactionUseCase) (OutputCreateTransactionUseCase, *domain.Exception) {
-	var output OutputCreateTransactionUseCase
+func CreateTransactionUseCase(
+	ctx context.Context,
+	input InputCreateTransactionUseCase,
+	createFunc TCreateTransactionRepoFunc,
+) (*domain.Client, *domain.Exception) {
 
 	transaction := &domain.Transaction{
-		ClientID:    input.ClientID,
 		Value:       input.Value,
 		Type:        input.Type,
 		Description: input.Description,
 	}
 
-	if err := transaction.Validate(); err != nil {
-		return output, domain.HandleError(err)
+	if !transaction.IsValid() {
+		return nil, domain.HandleError(domain.ErrInvalidTransaction)
 	}
 
-	client, err := useCase.Repository.CreateTransactionAndUpdateBalance(input.ClientID, transaction)
+	client, err := createFunc(ctx, input.ClientID, transaction)
 
 	if err != nil {
-		return output, domain.HandleError(err)
+		return client, domain.HandleError(err)
 	}
 
-	output.Balance = client.Balance
-	output.Limit = client.AccountLimit
-
-	return output, nil
+	return client, nil
 }
